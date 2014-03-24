@@ -30,6 +30,16 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
       } else if (metadata.won) {
         self.message(true); // You win!
       }
+      window.setTimeout(function(){
+        self.clearContainer(self.tileContainer);
+        grid.cells.forEach(function (column) {
+          column.forEach(function (cell) {
+            if (cell) {
+              self.addTile(cell, true);
+            }
+          });
+        });
+      }, 1000);
     }
 
   });
@@ -46,7 +56,7 @@ HTMLActuator.prototype.clearContainer = function (container) {
   }
 };
 
-HTMLActuator.prototype.addTile = function (tile) {
+HTMLActuator.prototype.addTile = function (tile, terminated) {
   var self = this;
 
   var wrapper   = document.createElement("div");
@@ -55,32 +65,34 @@ HTMLActuator.prototype.addTile = function (tile) {
   var positionClass = this.positionClass(position);
 
   // We can't use classlist because it somehow glitches when replacing classes
-  var classes = ["tile", "tile-" + tile.value, positionClass];
+  var classes = ["tile", terminated ? ("tile-" + tile.value) : "tile-2", positionClass];
 
   if (tile.value > 2048) classes.push("tile-super");
 
   this.applyClasses(wrapper, classes);
 
   inner.classList.add("tile-inner");
-  inner.textContent = tile.value;
+  inner.textContent = terminated ? tile.value : " ";
 
-  if (tile.previousPosition) {
-    // Make sure that the tile gets rendered in the previous position first
-    window.requestAnimationFrame(function () {
-      classes[2] = self.positionClass({ x: tile.x, y: tile.y });
-      self.applyClasses(wrapper, classes); // Update the position
-    });
-  } else if (tile.mergedFrom) {
-    classes.push("tile-merged");
-    this.applyClasses(wrapper, classes);
+  if (!terminated) {
+      if (tile.previousPosition) {
+        // Make sure that the tile gets rendered in the previous position first
+        window.requestAnimationFrame(function () {
+          classes[2] = self.positionClass({ x: tile.x, y: tile.y });
+          self.applyClasses(wrapper, classes); // Update the position
+        });
+      } else if (tile.mergedFrom) {
+        classes.push("tile-merged");
+        this.applyClasses(wrapper, classes);
 
-    // Render the tiles that merged
-    tile.mergedFrom.forEach(function (merged) {
-      self.addTile(merged);
-    });
-  } else {
-    classes.push("tile-new");
-    this.applyClasses(wrapper, classes);
+        // Render the tiles that merged
+        tile.mergedFrom.forEach(function (merged) {
+          self.addTile(merged);
+        });
+      } else {
+        classes.push("tile-new");
+        this.applyClasses(wrapper, classes);
+      }
   }
 
   // Add the inner part of the tile to the wrapper
@@ -109,19 +121,21 @@ HTMLActuator.prototype.updateScore = function (score) {
   var difference = score - this.score;
   this.score = score;
 
-  this.scoreContainer.textContent = this.score;
+  this.scoreContainer.textContent = "???";
 
   if (difference > 0) {
     var addition = document.createElement("div");
     addition.classList.add("score-addition");
-    addition.textContent = "+" + difference;
+    addition.textContent = "+??";
 
     this.scoreContainer.appendChild(addition);
   }
 };
 
 HTMLActuator.prototype.updateBestScore = function (bestScore) {
-  this.bestContainer.textContent = bestScore;
+  if (this.score < bestScore) {
+      this.bestContainer.textContent = bestScore;
+  }
 };
 
 HTMLActuator.prototype.message = function (won) {
@@ -130,6 +144,7 @@ HTMLActuator.prototype.message = function (won) {
 
   this.messageContainer.classList.add(type);
   this.messageContainer.getElementsByTagName("p")[0].textContent = message;
+  document.getElementById("score").textContent = this.score;
 };
 
 HTMLActuator.prototype.clearMessage = function () {
